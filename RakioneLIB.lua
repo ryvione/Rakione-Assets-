@@ -284,6 +284,7 @@ local Templates = {
     Window = {
         Title = "No Title",
         Footer = "No Footer",
+        Icon = "https://rakionedev.vercel.app/assets/rakione-logo-DYCfdTPN.png",
         Position = UDim2.fromOffset(6, 6),
         Size = UDim2.fromOffset(760, 640),
         IconSize = UDim2.fromOffset(30, 30),
