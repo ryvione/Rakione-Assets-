@@ -1587,7 +1587,7 @@ function Library:AddGlowEffect(Frame: GuiObject, Intensity: number?)
     })
     
     New("UICorner", {
-        CornerRadius = UDim.new(0, 10)),
+        CornerRadius = UDim.new(0, 10),
         Parent = Glow,
     })
     
