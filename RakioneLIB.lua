@@ -146,10 +146,6 @@ local Library = {
 
     ScreenGui = nil,
 
-    SearchText = "",
-    Searching = false,
-    GlobalSearch = false,
-    LastSearchTab = nil,
 
     ActiveTab = nil,
     Tabs = {},
@@ -291,8 +287,6 @@ local Templates = {
         AutoShow = true,
         Center = true,
         Resizable = true,
-        SearchbarSize = UDim2.fromScale(1, 1),
-        GlobalSearch = false,
         CornerRadius = 16,
         NotifySide = "Right",
         ShowCustomCursor = true,
@@ -576,444 +570,11 @@ function Library:UpdateDependencyBoxes()
         Depbox:Update(true)
     end
 
-    if Library.Searching then
-        Library:UpdateSearch(Library.SearchText)
-    end
 end
 
-local function CheckDepbox(Box, Search)
-    local VisibleElements = 0
+-- Search feature removed - no longer needed
 
-    for _, ElementInfo in pairs(Box.Elements) do
-        if ElementInfo.Type == "Divider" then
-            ElementInfo.Holder.Visible = false
-            continue
-        elseif ElementInfo.SubButton then
-            --// Check if any of the Buttons Name matches with Search
-            local Visible = false
-
-            --// Check if Search matches Element's Name and if Element is Visible
-            if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                Visible = true
-            else
-                ElementInfo.Base.Visible = false
-            end
-            if ElementInfo.SubButton.Text:lower():match(Search) and ElementInfo.SubButton.Visible then
-                Visible = true
-            else
-                ElementInfo.SubButton.Base.Visible = false
-            end
-            ElementInfo.Holder.Visible = Visible
-            if Visible then
-                VisibleElements += 1
-            end
-
-            continue
-        end
-
-        --// Check if Search matches Element's Name and if Element is Visible
-        if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-            ElementInfo.Holder.Visible = true
-            VisibleElements += 1
-        else
-            ElementInfo.Holder.Visible = false
-        end
-    end
-
-    for _, Depbox in pairs(Box.DependencyBoxes) do
-        if not Depbox.Visible then
-            continue
-        end
-
-        VisibleElements += CheckDepbox(Depbox, Search)
-    end
-
-    return VisibleElements
-end
-local function RestoreDepbox(Box)
-    for _, ElementInfo in pairs(Box.Elements) do
-        ElementInfo.Holder.Visible = typeof(ElementInfo.Visible) == "boolean" and ElementInfo.Visible or true
-
-        if ElementInfo.SubButton then
-            ElementInfo.Base.Visible = ElementInfo.Visible
-            ElementInfo.SubButton.Base.Visible = ElementInfo.SubButton.Visible
-        end
-    end
-
-    Box:Resize()
-    Box.Holder.Visible = true
-
-    for _, Depbox in pairs(Box.DependencyBoxes) do
-        if not Depbox.Visible then
-            continue
-        end
-
-        RestoreDepbox(Depbox)
-    end
-end
-
-function Library:UpdateSearch(SearchText)
-    Library.SearchText = SearchText
-
-    local TabsToReset = {}
-
-    if Library.GlobalSearch then
-        for _, Tab in pairs(Library.Tabs) do
-            if typeof(Tab) == "table" and not Tab.IsKeyTab then
-                table.insert(TabsToReset, Tab)
-            end
-        end
-    elseif Library.LastSearchTab and typeof(Library.LastSearchTab) == "table" then
-        table.insert(TabsToReset, Library.LastSearchTab)
-    end
-
-    local function ResetTab(Tab)
-        if not Tab then
-            return
-        end
-
-        for _, Groupbox in pairs(Tab.Groupboxes) do
-            for _, ElementInfo in pairs(Groupbox.Elements) do
-                ElementInfo.Holder.Visible = typeof(ElementInfo.Visible) == "boolean" and ElementInfo.Visible or true
-
-                if ElementInfo.SubButton then
-                    ElementInfo.Base.Visible = ElementInfo.Visible
-                    ElementInfo.SubButton.Base.Visible = ElementInfo.SubButton.Visible
-                end
-            end
-
-            for _, Depbox in pairs(Groupbox.DependencyBoxes) do
-                if not Depbox.Visible then
-                    continue
-                end
-
-                RestoreDepbox(Depbox)
-            end
-
-            Groupbox:Resize()
-            Groupbox.Holder.Visible = true
-        end
-
-        for _, Tabbox in pairs(Tab.Tabboxes) do
-            for _, SubTab in pairs(Tabbox.Tabs) do
-                for _, ElementInfo in pairs(SubTab.Elements) do
-                    ElementInfo.Holder.Visible =
-                        typeof(ElementInfo.Visible) == "boolean" and ElementInfo.Visible or true
-
-                    if ElementInfo.SubButton then
-                        ElementInfo.Base.Visible = ElementInfo.Visible
-                        ElementInfo.SubButton.Base.Visible = ElementInfo.SubButton.Visible
-                    end
-                end
-
-                for _, Depbox in pairs(SubTab.DependencyBoxes) do
-                    if not Depbox.Visible then
-                        continue
-                    end
-
-                    RestoreDepbox(Depbox)
-                end
-
-                SubTab.ButtonHolder.Visible = true
-            end
-
-            if Tabbox.ActiveTab then
-                Tabbox.ActiveTab:Resize()
-            end
-            Tabbox.Holder.Visible = true
-        end
-
-        for _, DepGroupbox in pairs(Tab.DependencyGroupboxes) do
-            if not DepGroupbox.Visible then
-                continue
-            end
-
-            for _, ElementInfo in pairs(DepGroupbox.Elements) do
-                ElementInfo.Holder.Visible =
-                    typeof(ElementInfo.Visible) == "boolean" and ElementInfo.Visible or true
-
-                if ElementInfo.SubButton then
-                    ElementInfo.Base.Visible = ElementInfo.Visible
-                    ElementInfo.SubButton.Base.Visible = ElementInfo.SubButton.Visible
-                end
-            end
-
-            for _, Depbox in pairs(DepGroupbox.DependencyBoxes) do
-                if not Depbox.Visible then
-                    continue
-                end
-
-                RestoreDepbox(Depbox)
-            end
-
-            DepGroupbox:Resize()
-            DepGroupbox.Holder.Visible = true
-        end
-    end
-
-    for _, Tab in ipairs(TabsToReset) do
-        ResetTab(Tab)
-    end
-
-    local Search = SearchText:lower()
-    if Trim(Search) == "" then
-        Library.Searching = false
-        Library.LastSearchTab = nil
-        return
-    end
-    if not Library.GlobalSearch and Library.ActiveTab and Library.ActiveTab.IsKeyTab then
-        Library.Searching = false
-        Library.LastSearchTab = nil
-        return
-    end
-
-    Library.Searching = true
-
-    local TabsToSearch = {}
-
-    if Library.GlobalSearch then
-        TabsToSearch = TabsToReset
-        if #TabsToSearch == 0 then
-            for _, Tab in pairs(Library.Tabs) do
-                if typeof(Tab) == "table" and not Tab.IsKeyTab then
-                    table.insert(TabsToSearch, Tab)
-                end
-            end
-        end
-    elseif Library.ActiveTab then
-        table.insert(TabsToSearch, Library.ActiveTab)
-    end
-
-    local function ApplySearchToTab(Tab)
-        if not Tab then
-            return
-        end
-
-        local HasVisible = false
-
-        --// Loop through Groupboxes to get Elements Info
-        for _, Groupbox in pairs(Tab.Groupboxes) do
-            local VisibleElements = 0
-
-            for _, ElementInfo in pairs(Groupbox.Elements) do
-                if ElementInfo.Type == "Divider" then
-                    ElementInfo.Holder.Visible = false
-                    continue
-                elseif ElementInfo.SubButton then
-                    --// Check if any of the Buttons Name matches with Search
-                    local Visible = false
-
-                    --// Check if Search matches Element's Name and if Element is Visible
-                    if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                        Visible = true
-                    else
-                        ElementInfo.Base.Visible = false
-                    end
-                    if ElementInfo.SubButton.Text:lower():match(Search) and ElementInfo.SubButton.Visible then
-                        Visible = true
-                    else
-                        ElementInfo.SubButton.Base.Visible = false
-                    end
-                    ElementInfo.Holder.Visible = Visible
-                    if Visible then
-                        VisibleElements += 1
-                    end
-
-                    continue
-                end
-
-                --// Check if Search matches Element's Name and if Element is Visible
-                if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                    ElementInfo.Holder.Visible = true
-                    VisibleElements += 1
-                else
-                    ElementInfo.Holder.Visible = false
-                end
-            end
-
-            for _, Depbox in pairs(Groupbox.DependencyBoxes) do
-                if not Depbox.Visible then
-                    continue
-                end
-
-                VisibleElements += CheckDepbox(Depbox, Search)
-            end
-
-            --// Update Groupbox Size and Visibility if found any element
-            if VisibleElements > 0 then
-                Groupbox:Resize()
-                HasVisible = true
-            end
-            Groupbox.Holder.Visible = VisibleElements > 0
-        end
-
-        for _, Tabbox in pairs(Tab.Tabboxes) do
-            local VisibleTabs = 0
-            local VisibleElements = {}
-
-            for _, SubTab in pairs(Tabbox.Tabs) do
-                VisibleElements[SubTab] = 0
-
-                for _, ElementInfo in pairs(SubTab.Elements) do
-                    if ElementInfo.Type == "Divider" then
-                        ElementInfo.Holder.Visible = false
-                        continue
-                    elseif ElementInfo.SubButton then
-                        --// Check if any of the Buttons Name matches with Search
-                        local Visible = false
-
-                        --// Check if Search matches Element's Name and if Element is Visible
-                        if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                            Visible = true
-                        else
-                            ElementInfo.Base.Visible = false
-                        end
-                        if ElementInfo.SubButton.Text:lower():match(Search) and ElementInfo.SubButton.Visible then
-                            Visible = true
-                        else
-                            ElementInfo.SubButton.Base.Visible = false
-                        end
-                        ElementInfo.Holder.Visible = Visible
-                        if Visible then
-                            VisibleElements[SubTab] += 1
-                        end
-
-                        continue
-                    end
-
-                    --// Check if Search matches Element's Name and if Element is Visible
-                    if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                        ElementInfo.Holder.Visible = true
-                        VisibleElements[SubTab] += 1
-                    else
-                        ElementInfo.Holder.Visible = false
-                    end
-                end
-
-                for _, Depbox in pairs(SubTab.DependencyBoxes) do
-                    if not Depbox.Visible then
-                        continue
-                    end
-
-                    VisibleElements[SubTab] += CheckDepbox(Depbox, Search)
-                end
-            end
-
-            for SubTab, Visible in pairs(VisibleElements) do
-                SubTab.ButtonHolder.Visible = Visible > 0
-                if Visible > 0 then
-                    VisibleTabs += 1
-                    HasVisible = true
-
-                    if Tabbox.ActiveTab == SubTab then
-                        SubTab:Resize()
-                    elseif Tabbox.ActiveTab and VisibleElements[Tabbox.ActiveTab] == 0 then
-                        SubTab:Show()
-                    end
-                end
-            end
-
-            --// Update Tabbox Visibility if any visible
-            Tabbox.Holder.Visible = VisibleTabs > 0
-        end
-
-        for _, DepGroupbox in pairs(Tab.DependencyGroupboxes) do
-            if not DepGroupbox.Visible then
-                continue
-            end
-
-            local VisibleElements = 0
-
-            for _, ElementInfo in pairs(DepGroupbox.Elements) do
-                if ElementInfo.Type == "Divider" then
-                    ElementInfo.Holder.Visible = false
-                    continue
-                elseif ElementInfo.SubButton then
-                    --// Check if any of the Buttons Name matches with Search
-                    local Visible = false
-
-                    --// Check if Search matches Element's Name and if Element is Visible
-                    if ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                        Visible = true
-                    else
-                        ElementInfo.Base.Visible = false
-                    end
-                    if ElementInfo.SubButton.Text:lower():match(Search) and ElementInfo.SubButton.Visible then
-                        Visible = true
-                    else
-                        ElementInfo.SubButton.Base.Visible = false
-                    end
-                    ElementInfo.Holder.Visible = Visible
-                    if Visible then
-                        VisibleElements += 1
-                    end
-
-                    continue
-                end
-
-                --// Check if Search matches Element's Name and if Element is Visible
-                if ElementInfo.Text and ElementInfo.Text:lower():match(Search) and ElementInfo.Visible then
-                    ElementInfo.Holder.Visible = true
-                    VisibleElements += 1
-                else
-                    ElementInfo.Holder.Visible = false
-                end
-            end
-
-            for _, Depbox in pairs(DepGroupbox.DependencyBoxes) do
-                if not Depbox.Visible then
-                    continue
-                end
-
-                VisibleElements += CheckDepbox(Depbox, Search)
-            end
-
-            --// Update Groupbox Size and Visibility if found any element
-            if VisibleElements > 0 then
-                DepGroupbox:Resize()
-                HasVisible = true
-            end
-            DepGroupbox.Holder.Visible = VisibleElements > 0
-        end
-
-        return HasVisible
-    end
-
-    local FirstVisibleTab = nil
-    local ActiveHasVisible = false
-
-    for _, Tab in ipairs(TabsToSearch) do
-        local HasVisible = ApplySearchToTab(Tab)
-        if HasVisible then
-            if not FirstVisibleTab then
-                FirstVisibleTab = Tab
-            end
-            if Tab == Library.ActiveTab then
-                ActiveHasVisible = true
-            end
-        end
-    end
-
-    if Library.GlobalSearch then
-        if ActiveHasVisible and Library.ActiveTab then
-            Library.ActiveTab:RefreshSides()
-        elseif FirstVisibleTab then
-            local SearchMarker = SearchText
-            task.defer(function()
-                if Library.SearchText ~= SearchMarker then
-                    return
-                end
-
-                if Library.ActiveTab ~= FirstVisibleTab then
-                    FirstVisibleTab:Show()
-                end
-            end)
-        end
-        Library.LastSearchTab = nil
-    else
-        Library.LastSearchTab = Library.ActiveTab
-    end
-end
+-- Search feature removed - no longer needed
 
 function Library:AddToRegistry(Instance, Properties)
     Library.Registry[Instance] = Properties
@@ -1120,33 +681,48 @@ type IconModule = {
     GetAsset: (Name: string) -> Icon?,
 }
 
-local FetchIcons, Icons = pcall(function()
-    return (loadstring(
-        game:HttpGet("https://raw.githubusercontent.com/deividcomsono/lucide-roblox-direct/refs/heads/main/source.lua")
-    ) :: () -> IconModule)()
-end)
+-- Custom icon system - uses simple text/emoji instead of external icons
+local IconMap = {
+    ["home"] = "🏠",
+    ["user"] = "👤",
+    ["eye"] = "👁",
+    ["target"] = "🎯",
+    ["map-pin"] = "📍",
+    ["keyboard"] = "⌨️",
+    ["code"] = "💻",
+    ["settings"] = "⚙️",
+    ["cog"] = "⚙️",
+    ["key"] = "🔑",
+    ["check"] = "✓",
+    ["chevron-up"] = "▲",
+    ["move-diagonal-2"] = "↔️",
+    ["move"] = "↔️",
+}
 
 function Library:GetIcon(IconName: string)
-    if not FetchIcons then
-        return
-    end
-
-    local Success, Icon = pcall(Icons.GetAsset, IconName)
-    if not Success then
-        return
-    end
-    return Icon
+    -- Return nil - we use text icons instead
+    return nil
 end
 
 function Library:GetCustomIcon(IconName: string)
-    if not IsValidCustomIcon(IconName) then
-        return Library:GetIcon(IconName)
-    else
+    if IsValidCustomIcon(IconName) then
         return {
             Url = IconName,
             ImageRectOffset = Vector2.zero,
             ImageRectSize = Vector2.zero,
             Custom = true,
+        }
+    elseif IconMap[IconName] then
+        -- Return text icon
+        return {
+            Text = IconMap[IconName],
+            IsText = true,
+        }
+    else
+        -- Default to first letter or emoji
+        return {
+            Text = IconName:sub(1, 1):upper(),
+            IsText = true,
         }
     end
 end
@@ -2105,22 +1681,23 @@ function Library:Unload()
     getgenv().Library = nil
 end
 
-local CheckIcon = Library:GetIcon("check")
-local ArrowIcon = Library:GetIcon("chevron-up")
-local ResizeIcon = Library:GetIcon("move-diagonal-2")
-local KeyIcon = Library:GetIcon("key")
-local MoveIcon = Library:GetIcon("move")
+-- Custom text-based icons instead of external icons
+local CheckIcon = {Text = "✓", IsText = true}
+local ArrowIcon = {Text = "▲", IsText = true}
+local ResizeIcon = {Text = "↔", IsText = true}
+local KeyIcon = {Text = "🔑", IsText = true}
+local MoveIcon = {Text = "✥", IsText = true}
 
 function Library:SetIconModule(module: IconModule)
     FetchIcons = true
     Icons = module
 
     -- Top ten fixes 🚀
-    CheckIcon = Library:GetIcon("check")
-    ArrowIcon = Library:GetIcon("chevron-up")
-    ResizeIcon = Library:GetIcon("move-diagonal-2")
-    KeyIcon = Library:GetIcon("key")
-    MoveIcon = Library:GetIcon("move")
+    CheckIcon = {Text = "✓", IsText = true}
+    ArrowIcon = {Text = "▲", IsText = true}
+    ResizeIcon = {Text = "↔", IsText = true}
+    KeyIcon = {Text = "🔑", IsText = true}
+    MoveIcon = {Text = "✥", IsText = true}
 end
 
 local BaseAddons = {}
@@ -2345,20 +1922,38 @@ do
                 Parent = Checkbox,
             })
 
-            local CheckImage = New("ImageLabel", {
-                Image = CheckIcon and CheckIcon.Url or "",
-                ImageColor3 = "FontColor",
-                ImageRectOffset = CheckIcon and CheckIcon.ImageRectOffset or Vector2.zero,
-                ImageRectSize = CheckIcon and CheckIcon.ImageRectSize or Vector2.zero,
-                ImageTransparency = 1,
-                Position = UDim2.fromOffset(2, 2),
-                Size = UDim2.new(1, -4, 1, -4),
-                Parent = Checkbox,
-            })
+            local CheckImage
+            if CheckIcon and CheckIcon.IsText then
+                CheckImage = New("TextLabel", {
+                    BackgroundTransparency = 1,
+                    Text = CheckIcon.Text,
+                    TextColor3 = "FontColor",
+                    TextSize = 12,
+                    TextTransparency = 1,
+                    Position = UDim2.fromOffset(2, 2),
+                    Size = UDim2.new(1, -4, 1, -4),
+                    Parent = Checkbox,
+                })
+            else
+                CheckImage = New("ImageLabel", {
+                    Image = CheckIcon and CheckIcon.Url or "",
+                    ImageColor3 = "FontColor",
+                    ImageRectOffset = CheckIcon and CheckIcon.ImageRectOffset or Vector2.zero,
+                    ImageRectSize = CheckIcon and CheckIcon.ImageRectSize or Vector2.zero,
+                    ImageTransparency = 1,
+                    Position = UDim2.fromOffset(2, 2),
+                    Size = UDim2.new(1, -4, 1, -4),
+                    Parent = Checkbox,
+                })
+            end
 
             function KeybindsToggle:Display(State)
                 Label.TextTransparency = State and 0 or 0.5
-                CheckImage.ImageTransparency = State and 0 or 1
+                if CheckImage:IsA("TextLabel") then
+                    CheckImage.TextTransparency = State and 0 or 1
+                else
+                    CheckImage.ImageTransparency = State and 0 or 1
+                end
             end
 
             function KeybindsToggle:SetText(Text)
@@ -3732,16 +3327,30 @@ do
             Parent = Checkbox,
         })
 
-        local CheckImage = New("ImageLabel", {
-            Image = CheckIcon and CheckIcon.Url or "",
-            ImageColor3 = "FontColor",
-            ImageRectOffset = CheckIcon and CheckIcon.ImageRectOffset or Vector2.zero,
-            ImageRectSize = CheckIcon and CheckIcon.ImageRectSize or Vector2.zero,
-            ImageTransparency = 1,
-            Position = UDim2.fromOffset(2, 2),
-            Size = UDim2.new(1, -4, 1, -4),
-            Parent = Checkbox,
-        })
+        local CheckImage
+        if CheckIcon and CheckIcon.IsText then
+            CheckImage = New("TextLabel", {
+                BackgroundTransparency = 1,
+                Text = CheckIcon.Text,
+                TextColor3 = "FontColor",
+                TextSize = 12,
+                TextTransparency = 1,
+                Position = UDim2.fromOffset(2, 2),
+                Size = UDim2.new(1, -4, 1, -4),
+                Parent = Checkbox,
+            })
+        else
+            CheckImage = New("ImageLabel", {
+                Image = CheckIcon and CheckIcon.Url or "",
+                ImageColor3 = "FontColor",
+                ImageRectOffset = CheckIcon and CheckIcon.ImageRectOffset or Vector2.zero,
+                ImageRectSize = CheckIcon and CheckIcon.ImageRectSize or Vector2.zero,
+                ImageTransparency = 1,
+                Position = UDim2.fromOffset(2, 2),
+                Size = UDim2.new(1, -4, 1, -4),
+                Parent = Checkbox,
+            })
+        end
 
         function Toggle:UpdateColors()
             Toggle:Display()
@@ -3756,7 +3365,11 @@ do
 
             if Toggle.Disabled then
                 Label.TextTransparency = 0.8
-                CheckImage.ImageTransparency = Toggle.Value and 0.8 or 1
+                if CheckImage:IsA("TextLabel") then
+                    CheckImage.TextTransparency = Toggle.Value and 0.8 or 1
+                else
+                    CheckImage.ImageTransparency = Toggle.Value and 0.8 or 1
+                end
 
                 Checkbox.BackgroundColor3 = Library.Scheme.BackgroundColor
                 Library.Registry[Checkbox].BackgroundColor3 = "BackgroundColor"
@@ -3767,9 +3380,15 @@ do
             TweenService:Create(Label, Library.TweenInfo, {
                 TextTransparency = Toggle.Value and 0 or 0.4,
             }):Play()
-            TweenService:Create(CheckImage, Library.TweenInfo, {
-                ImageTransparency = Toggle.Value and 0 or 1,
-            }):Play()
+            if CheckImage:IsA("TextLabel") then
+                TweenService:Create(CheckImage, Library.TweenInfo, {
+                    TextTransparency = Toggle.Value and 0 or 1,
+                }):Play()
+            else
+                TweenService:Create(CheckImage, Library.TweenInfo, {
+                    ImageTransparency = Toggle.Value and 0 or 1,
+                }):Play()
+            end
 
             Checkbox.BackgroundColor3 = Library.Scheme.MainColor
             Library.Registry[Checkbox].BackgroundColor3 = "MainColor"
@@ -4584,7 +4203,7 @@ do
 
         local ArrowImage = New("ImageLabel", {
             AnchorPoint = Vector2.new(1, 0.5),
-            Image = ArrowIcon and ArrowIcon.Url or "",
+            Image = ArrowIcon and not ArrowIcon.IsText and ArrowIcon.Url or "",
             ImageColor3 = "FontColor",
             ImageRectOffset = ArrowIcon and ArrowIcon.ImageRectOffset or Vector2.zero,
             ImageRectSize = ArrowIcon and ArrowIcon.ImageRectSize or Vector2.zero,
@@ -6419,12 +6038,7 @@ function Library:CreateWindow(WindowInfo)
                 BackgroundTransparency = 1,
                 Parent = TitleHolder,
             })
-            -- Try to load image asynchronously if it's an HTTP URL
-            if not tonumber(WindowInfo.Icon) and typeof(WindowInfo.Icon) == "string" and WindowInfo.Icon:match("^https?://") then
-                pcall(function()
-                    game:GetService("ContentProvider"):PreloadAsync({WindowIcon})
-                end)
-            end
+            -- For HTTP URLs, Roblox will load them automatically - no special handling needed
         else
             WindowIcon = New("TextButton", {
                 Text = WindowInfo.Title:sub(1, 1),
@@ -6474,101 +6088,12 @@ function Library:CreateWindow(WindowInfo)
             Parent = RightWrapper,
         })
 
-        CurrentTabInfo = New("Frame", {
-            Size = UDim2.fromScale(WindowInfo.DisableSearch and 1 or 0.5, 1),
-            Visible = false,
-            BackgroundTransparency = 1,
-            Parent = RightWrapper,
-        })
-
-        New("UIFlexItem", {
-            FlexMode = Enum.UIFlexMode.Grow,
-            Parent = CurrentTabInfo,
-        })
-
-        New("UIListLayout", {
-            FillDirection = Enum.FillDirection.Vertical,
-            HorizontalAlignment = Enum.HorizontalAlignment.Left,
-            VerticalAlignment = Enum.VerticalAlignment.Center,
-            Parent = CurrentTabInfo,
-        })
-
-        New("UIPadding", {
-            PaddingBottom = UDim.new(0, 8),
-            PaddingLeft = UDim.new(0, 2),
-            PaddingRight = UDim.new(0, 8),
-            PaddingTop = UDim.new(0, 8),
-            Parent = CurrentTabInfo,
-        })
-
-        CurrentTabLabel = New("TextLabel", {
-            BackgroundTransparency = 1,
-            Size = UDim2.fromScale(1, 0),
-            AutomaticSize = Enum.AutomaticSize.Y,
-            Text = "",
-            TextSize = 14,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = CurrentTabInfo,
-        })
-
-        CurrentTabDescription = New("TextLabel", {
-            BackgroundTransparency = 1,
-            Size = UDim2.fromScale(1, 0),
-            AutomaticSize = Enum.AutomaticSize.Y,
-            Text = "",
-            TextWrapped = true,
-            TextSize = 14,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            TextTransparency = 0.5,
-            Parent = CurrentTabInfo,
-        })
-
-        SearchBox = New("TextBox", {
-            BackgroundColor3 = "MainColor",
-            PlaceholderText = "Search",
-            Size = WindowInfo.SearchbarSize,
-            TextScaled = true,
-            Visible = not (WindowInfo.DisableSearch or false),
-            Parent = RightWrapper,
-        })
-        New("UIFlexItem", {
-            FlexMode = Enum.UIFlexMode.Shrink,
-            Parent = SearchBox,
-        })
-        New("UICorner", {
-            CornerRadius = UDim.new(0, WindowInfo.CornerRadius),
-            Parent = SearchBox,
-        })
-        New("UIPadding", {
-            PaddingBottom = UDim.new(0, 8),
-            PaddingLeft = UDim.new(0, 8),
-            PaddingRight = UDim.new(0, 8),
-            PaddingTop = UDim.new(0, 8),
-            Parent = SearchBox,
-        })
-        New("UIStroke", {
-            Color = "OutlineColor",
-            Parent = SearchBox,
-        })
-
-        local SearchIcon = Library:GetIcon("search")
-        if SearchIcon then
-            New("ImageLabel", {
-                Image = SearchIcon.Url,
-                ImageColor3 = "FontColor",
-                ImageRectOffset = SearchIcon.ImageRectOffset,
-                ImageRectSize = SearchIcon.ImageRectSize,
-                ImageTransparency = 0.5,
-                Size = UDim2.fromScale(1, 1),
-                SizeConstraint = Enum.SizeConstraint.RelativeYY,
-                Parent = SearchBox,
-            })
-        end
+        -- Search feature removed - no longer needed
 
         if MoveIcon then
             New("ImageLabel", {
                 AnchorPoint = Vector2.new(1, 0.5),
-                Image = MoveIcon.Url,
+                Image = MoveIcon and not MoveIcon.IsText and MoveIcon.Url or "",
                 ImageColor3 = "OutlineColor",
                 ImageRectOffset = MoveIcon.ImageRectOffset,
                 ImageRectSize = MoveIcon.ImageRectSize,
@@ -6633,7 +6158,7 @@ function Library:CreateWindow(WindowInfo)
         end
 
         New("ImageLabel", {
-            Image = ResizeIcon and ResizeIcon.Url or "",
+            Image = ResizeIcon and not ResizeIcon.IsText and ResizeIcon.Url or "",
             ImageColor3 = "FontColor",
             ImageRectOffset = ResizeIcon and ResizeIcon.ImageRectOffset or Vector2.zero,
             ImageRectSize = ResizeIcon and ResizeIcon.ImageRectSize or Vector2.zero,
@@ -6899,16 +6424,31 @@ function Library:CreateWindow(WindowInfo)
             table.insert(LayoutRefs.TabLabels, TabLabel)
 
             if Icon then
-                TabIcon = New("ImageLabel", {
-                    Image = Icon.Url,
-                    ImageColor3 = Icon.Custom and "White" or "AccentColor",
-                    ImageRectOffset = Icon.ImageRectOffset,
-                    ImageRectSize = Icon.ImageRectSize,
-                    ImageTransparency = 0.5,
-                    Size = UDim2.fromScale(1, 1),
-                    SizeConstraint = Enum.SizeConstraint.RelativeYY,
-                    Parent = TabButton,
-                })
+                if Icon.IsText then
+                    -- Use text icon instead of image
+                    TabIcon = New("TextLabel", {
+                        BackgroundTransparency = 1,
+                        Text = Icon.Text,
+                        TextSize = 18,
+                        TextColor3 = "AccentColor",
+                        TextTransparency = 0.5,
+                        Size = UDim2.fromOffset(24, 24),
+                        SizeConstraint = Enum.SizeConstraint.RelativeYY,
+                        FontFace = Library.Scheme.Font,
+                        Parent = TabButton,
+                    })
+                else
+                    TabIcon = New("ImageLabel", {
+                        Image = Icon.Url,
+                        ImageColor3 = Icon.Custom and "White" or "AccentColor",
+                        ImageRectOffset = Icon.ImageRectOffset,
+                        ImageRectSize = Icon.ImageRectSize,
+                        ImageTransparency = 0.5,
+                        Size = UDim2.fromScale(1, 1),
+                        SizeConstraint = Enum.SizeConstraint.RelativeYY,
+                        Parent = TabButton,
+                    })
+                end
             end
 
             --// Tab Container \\--
@@ -7517,9 +7057,15 @@ function Library:CreateWindow(WindowInfo)
                 TextTransparency = Hovering and 0.25 or 0.5,
             }):Play()
             if TabIcon then
-                TweenService:Create(TabIcon, Library.TweenInfo, {
-                    ImageTransparency = Hovering and 0.25 or 0.5,
-                }):Play()
+                if TabIcon:IsA("TextLabel") then
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        TextTransparency = Hovering and 0.25 or 0.5,
+                    }):Play()
+                else
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        ImageTransparency = Hovering and 0.25 or 0.5,
+                    }):Play()
+                end
             end
         end
 
@@ -7535,30 +7081,21 @@ function Library:CreateWindow(WindowInfo)
                 TextTransparency = 0,
             }):Play()
             if TabIcon then
-                TweenService:Create(TabIcon, Library.TweenInfo, {
-                    ImageTransparency = 0,
-                }):Play()
-            end
-
-            if Description then
-                CurrentTabInfo.Visible = true
-
-                if IsDefaultSearchbarSize then
-                    SearchBox.Size = UDim2.fromScale(0.5, 1)
+                if TabIcon:IsA("TextLabel") then
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        TextTransparency = 0,
+                    }):Play()
+                else
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        ImageTransparency = 0,
+                    }):Play()
                 end
-
-                CurrentTabLabel.Text = Name
-                CurrentTabDescription.Text = Description
             end
 
             TabContainer.Visible = true
             Tab:RefreshSides()
 
             Library.ActiveTab = Tab
-
-            if Library.Searching then
-                Library:UpdateSearch(Library.SearchText)
-            end
         end
 
         function Tab:Hide()
@@ -7569,17 +7106,17 @@ function Library:CreateWindow(WindowInfo)
                 TextTransparency = 0.5,
             }):Play()
             if TabIcon then
-                TweenService:Create(TabIcon, Library.TweenInfo, {
-                    ImageTransparency = 0.5,
-                }):Play()
+                if TabIcon:IsA("TextLabel") then
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        TextTransparency = 0.5,
+                    }):Play()
+                else
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        ImageTransparency = 0.5,
+                    }):Play()
+                end
             end
             TabContainer.Visible = false
-
-            if IsDefaultSearchbarSize then
-                SearchBox.Size = UDim2.fromScale(1, 1)
-            end
-
-            CurrentTabInfo.Visible = false
 
             Library.ActiveTab = nil
         end
@@ -7626,7 +7163,7 @@ function Library:CreateWindow(WindowInfo)
 
         local TabContainer
 
-        Icon = if Icon == "key" then KeyIcon else Library:GetCustomIcon(Icon)
+        Icon = if Icon == "key" then {Text = "🔑", IsText = true} else Library:GetCustomIcon(Icon)
         do
             TabButton = New("TextButton", {
                 BackgroundColor3 = "MainColor",
@@ -7658,16 +7195,31 @@ function Library:CreateWindow(WindowInfo)
             table.insert(LayoutRefs.TabLabels, TabLabel)
 
             if Icon then
-                TabIcon = New("ImageLabel", {
-                    Image = Icon.Url,
-                    ImageColor3 = Icon.Custom and "White" or "AccentColor",
-                    ImageRectOffset = Icon.ImageRectOffset,
-                    ImageRectSize = Icon.ImageRectSize,
-                    ImageTransparency = 0.5,
-                    Size = UDim2.fromScale(1, 1),
-                    SizeConstraint = Enum.SizeConstraint.RelativeYY,
-                    Parent = TabButton,
-                })
+                if Icon.IsText then
+                    -- Use text icon instead of image
+                    TabIcon = New("TextLabel", {
+                        BackgroundTransparency = 1,
+                        Text = Icon.Text,
+                        TextSize = 18,
+                        TextColor3 = "AccentColor",
+                        TextTransparency = 0.5,
+                        Size = UDim2.fromOffset(24, 24),
+                        SizeConstraint = Enum.SizeConstraint.RelativeYY,
+                        FontFace = Library.Scheme.Font,
+                        Parent = TabButton,
+                    })
+                else
+                    TabIcon = New("ImageLabel", {
+                        Image = Icon.Url,
+                        ImageColor3 = Icon.Custom and "White" or "AccentColor",
+                        ImageRectOffset = Icon.ImageRectOffset,
+                        ImageRectSize = Icon.ImageRectSize,
+                        ImageTransparency = 0.5,
+                        Size = UDim2.fromScale(1, 1),
+                        SizeConstraint = Enum.SizeConstraint.RelativeYY,
+                        Parent = TabButton,
+                    })
+                end
             end
 
             --// Tab Container \\--
@@ -7761,9 +7313,15 @@ function Library:CreateWindow(WindowInfo)
                 TextTransparency = Hovering and 0.25 or 0.5,
             }):Play()
             if TabIcon then
-                TweenService:Create(TabIcon, Library.TweenInfo, {
-                    ImageTransparency = Hovering and 0.25 or 0.5,
-                }):Play()
+                if TabIcon:IsA("TextLabel") then
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        TextTransparency = Hovering and 0.25 or 0.5,
+                    }):Play()
+                else
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        ImageTransparency = Hovering and 0.25 or 0.5,
+                    }):Play()
+                end
             end
         end
 
@@ -7779,30 +7337,21 @@ function Library:CreateWindow(WindowInfo)
                 TextTransparency = 0,
             }):Play()
             if TabIcon then
-                TweenService:Create(TabIcon, Library.TweenInfo, {
-                    ImageTransparency = 0,
-                }):Play()
+                if TabIcon:IsA("TextLabel") then
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        TextTransparency = 0,
+                    }):Play()
+                else
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        ImageTransparency = 0,
+                    }):Play()
+                end
             end
             TabContainer.Visible = true
-
-            if Description then
-                CurrentTabInfo.Visible = true
-
-                if IsDefaultSearchbarSize then
-                    SearchBox.Size = UDim2.fromScale(0.5, 1)
-                end
-
-                CurrentTabLabel.Text = Name
-                CurrentTabDescription.Text = Description
-            end
 
             Tab:RefreshSides()
 
             Library.ActiveTab = Tab
-
-            if Library.Searching then
-                Library:UpdateSearch(Library.SearchText)
-            end
         end
 
         function Tab:Hide()
@@ -7813,17 +7362,17 @@ function Library:CreateWindow(WindowInfo)
                 TextTransparency = 0.5,
             }):Play()
             if TabIcon then
-                TweenService:Create(TabIcon, Library.TweenInfo, {
-                    ImageTransparency = 0.5,
-                }):Play()
+                if TabIcon:IsA("TextLabel") then
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        TextTransparency = 0.5,
+                    }):Play()
+                else
+                    TweenService:Create(TabIcon, Library.TweenInfo, {
+                        ImageTransparency = 0.5,
+                    }):Play()
+                end
             end
             TabContainer.Visible = false
-
-            if IsDefaultSearchbarSize then
-                SearchBox.Size = UDim2.fromScale(1, 1)
-            end
-
-            CurrentTabInfo.Visible = false
 
             Library.ActiveTab = nil
         end
@@ -7901,31 +7450,34 @@ function Library:CreateWindow(WindowInfo)
     end
 
     if Library.IsMobile then
-        local ToggleButton = Library:AddDraggableButton("Toggle", function()
+        -- Replace toggle/lock buttons with Rakione logo button
+        local logoUrl = WindowInfo.Icon or "https://rakionedev.vercel.app/assets/rakione-logo-DYCfdTPN.png"
+        local LogoButton = New("ImageButton", {
+            BackgroundTransparency = 1,
+            Size = UDim2.fromOffset(50, 50),
+            Position = WindowInfo.MobileButtonsSide == "Right" and UDim2.new(1, -56, 0, 6) or UDim2.fromOffset(6, 6),
+            AnchorPoint = WindowInfo.MobileButtonsSide == "Right" and Vector2.new(1, 0) or Vector2.zero,
+            Image = logoUrl,
+            ZIndex = 10,
+            Parent = ScreenGui,
+            
+            DPIExclude = {
+                Position = true,
+            },
+        })
+        New("UICorner", {
+            CornerRadius = UDim.new(0, Library.CornerRadius),
+            Parent = LogoButton,
+        })
+        
+        LogoButton.MouseButton1Click:Connect(function()
             Library:Toggle()
         end)
-
-        local LockButton = Library:AddDraggableButton("Lock", function(self)
-            Library.CantDragForced = not Library.CantDragForced
-            self:SetText(Library.CantDragForced and "Unlock" or "Lock")
-        end)
-
-        if WindowInfo.MobileButtonsSide == "Right" then
-            ToggleButton.Button.Position = UDim2.new(1, -6, 0, 6)
-            ToggleButton.Button.AnchorPoint = Vector2.new(1, 0)
-
-            LockButton.Button.Position = UDim2.new(1, -6, 0, 46)
-            LockButton.Button.AnchorPoint = Vector2.new(1, 0)
-        else
-            LockButton.Button.Position = UDim2.fromOffset(6, 46)
-        end
+        
+        Library:MakeDraggable(LogoButton, LogoButton, true)
     end
 
     --// Execution \\--
-    SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        Library:UpdateSearch(SearchBox.Text)
-    end)
-
     Library:GiveSignal(UserInputService.InputBegan:Connect(function(Input: InputObject)
         if Library.Unloaded then
             return
