@@ -1,5 +1,4 @@
 -- THIS IS A PROTOTYPE AND IN ALPHA A LOT OF THINGS ARE EXPECTED TO BE CHANGED.
--- TEST COMMIT
 
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
