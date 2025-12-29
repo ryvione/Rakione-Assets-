@@ -188,7 +188,7 @@ local Library = {
     OriginalMinSize = Vector2.new(520, 400),
     MinSize = Vector2.new(520, 400),
     DPIScale = 1,
-    CornerRadius = 10,
+    CornerRadius = 16,
 
     IsLightTheme = false,
     Scheme = {
@@ -201,7 +201,7 @@ local Library = {
         OutlineColor = Color3.fromRGB(50, 40, 30),
         OutlineGlow = Color3.fromRGB(255, 140, 0),
         FontColor = Color3.new(1, 1, 1),
-        Font = Font.fromEnum(Enum.Font.GothamBold),
+        Font = Font.fromEnum(Enum.Font.Magnifico),
 
         Red = Color3.fromRGB(255, 50, 50),
         Dark = Color3.new(0, 0, 0),
@@ -293,10 +293,10 @@ local Templates = {
         Resizable = true,
         SearchbarSize = UDim2.fromScale(1, 1),
         GlobalSearch = false,
-        CornerRadius = 10,
+        CornerRadius = 16,
         NotifySide = "Right",
         ShowCustomCursor = true,
-        Font = Enum.Font.GothamBold,
+        Font = Enum.Font.Magnifico,
         ToggleKeybind = Enum.KeyCode.RightControl,
         MobileButtonsSide = "Left",
         UnlockMouseWhileOpen = true,
@@ -6336,20 +6336,13 @@ function Library:CreateWindow(WindowInfo)
             ZIndex = 2,
         })
 
-        local Lines = {
-            {
-                Position = UDim2.fromOffset(0, 48),
-                Size = UDim2.new(1, 0, 0, 1),
-            },
-            {
-                AnchorPoint = Vector2.new(0, 1),
-                Position = UDim2.new(0, 0, 1, -20),
-                Size = UDim2.new(1, 0, 0, 1),
-            },
+        -- Removed divider lines for cleaner look
+        local BottomLine = {
+            AnchorPoint = Vector2.new(0, 1),
+            Position = UDim2.new(0, 0, 1, -20),
+            Size = UDim2.new(1, 0, 0, 1),
         }
-        for _, Info in pairs(Lines) do
-            Library:MakeLine(MainFrame, Info)
-        end
+        Library:MakeLine(MainFrame, BottomLine)
 
         if WindowInfo.BackgroundImage then
             New("ImageLabel", {
@@ -6370,9 +6363,28 @@ function Library:CreateWindow(WindowInfo)
 
         --// Top Bar \\-
         local TopBar = New("Frame", {
-            BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, 48),
+            BackgroundColor3 = "MainColor",
+            BackgroundTransparency = 0,
+            Size = UDim2.new(1, 0, 0, 54),
             Parent = MainFrame,
+        })
+        -- Add gradient to TopBar for unique look
+        local TopBarGradient = New("UIGradient", {
+            Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Library.Scheme.AccentGradientStart),
+                ColorSequenceKeypoint.new(0.5, Library.Scheme.AccentGradientEnd),
+                ColorSequenceKeypoint.new(1, Library.Scheme.AccentGradientStart),
+            }),
+            Rotation = 90,
+            Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0.85),
+                NumberSequenceKeypoint.new(1, 0.95),
+            }),
+            Parent = TopBar,
+        })
+        New("UICorner", {
+            CornerRadius = UDim.new(0, WindowInfo.CornerRadius),
+            Parent = TopBar,
         })
         Library:MakeDraggable(MainFrame, TopBar, false, true)
 
@@ -6393,14 +6405,21 @@ function Library:CreateWindow(WindowInfo)
 
         local WindowIcon
         if WindowInfo.Icon then
+            local iconUrl = if tonumber(WindowInfo.Icon)
+                then string.format("rbxassetid://%d", WindowInfo.Icon)
+                else WindowInfo.Icon
             WindowIcon = New("ImageButton", {
-                Image = if tonumber(WindowInfo.Icon)
-                    then string.format("rbxassetid://%d", WindowInfo.Icon)
-                    else WindowInfo.Icon,
+                Image = iconUrl,
                 Size = WindowInfo.IconSize,
                 BackgroundTransparency = 1,
                 Parent = TitleHolder,
             })
+            -- Try to load image asynchronously if it's an HTTP URL
+            if not tonumber(WindowInfo.Icon) and typeof(WindowInfo.Icon) == "string" and WindowInfo.Icon:match("^https?://") then
+                pcall(function()
+                    game:GetService("ContentProvider"):PreloadAsync({WindowIcon})
+                end)
+            end
         else
             WindowIcon = New("TextButton", {
                 Text = WindowInfo.Title:sub(1, 1),
@@ -6416,7 +6435,8 @@ function Library:CreateWindow(WindowInfo)
         WindowTitle = New("TextButton", {
             BackgroundTransparency = 1,
             Text = WindowInfo.Title,
-            TextSize = 20,
+            TextSize = 22,
+            Font = Library.Scheme.Font,
             Visible = not LayoutState.IsCompact,
             Parent = TitleHolder,
         })
@@ -6623,9 +6643,9 @@ function Library:CreateWindow(WindowInfo)
             AutomaticCanvasSize = Enum.AutomaticSize.Y,
             BackgroundColor3 = "BackgroundColor",
             CanvasSize = UDim2.fromScale(0, 0),
-            Position = UDim2.fromOffset(0, 49),
+            Position = UDim2.fromOffset(0, 54),
             ScrollBarThickness = 0,
-            Size = UDim2.new(0, InitialSidebarWidth, 1, -70),
+            Size = UDim2.new(0, InitialSidebarWidth, 1, -74),
             Parent = MainFrame,
         })
         New("UIListLayout", {
@@ -6640,8 +6660,8 @@ function Library:CreateWindow(WindowInfo)
                 return Library:GetBetterColor(Library.Scheme.BackgroundColor, 1)
             end,
             Name = "Container",
-            Position = UDim2.fromOffset(InitialSidebarWidth, 49),
-            Size = UDim2.new(1, -InitialSidebarWidth, 1, -70),
+            Position = UDim2.fromOffset(InitialSidebarWidth, 54),
+            Size = UDim2.new(1, -InitialSidebarWidth, 1, -74),
             Parent = MainFrame,
         })
         New("UIPadding", {
@@ -6826,27 +6846,46 @@ function Library:CreateWindow(WindowInfo)
         do
             TabButton = New("TextButton", {
                 BackgroundColor3 = "MainColor",
-                BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 0, 40),
+                BackgroundTransparency = 0.7,
+                Size = UDim2.new(1, -8, 0, 46),
                 Text = "",
                 Parent = Tabs,
             })
+            -- Add corner radius to tab buttons
+            New("UICorner", {
+                CornerRadius = UDim.new(0, 12),
+                Parent = TabButton,
+            })
+            -- Add subtle gradient to tab buttons
+            local TabGradient = New("UIGradient", {
+                Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Library.Scheme.AccentGradientStart),
+                    ColorSequenceKeypoint.new(1, Library.Scheme.AccentGradientEnd),
+                }),
+                Rotation = 90,
+                Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 0.9),
+                    NumberSequenceKeypoint.new(1, 0.95),
+                }),
+                Parent = TabButton,
+            })
 
             local ButtonPadding = New("UIPadding", {
-                PaddingBottom = UDim.new(0, LayoutState.IsCompact and 7 or 11),
-                PaddingLeft = UDim.new(0, LayoutState.IsCompact and 14 or 12),
-                PaddingRight = UDim.new(0, LayoutState.IsCompact and 14 or 12),
-                PaddingTop = UDim.new(0, LayoutState.IsCompact and 7 or 11),
+                PaddingBottom = UDim.new(0, LayoutState.IsCompact and 9 or 13),
+                PaddingLeft = UDim.new(0, LayoutState.IsCompact and 16 or 18),
+                PaddingRight = UDim.new(0, LayoutState.IsCompact and 16 or 18),
+                PaddingTop = UDim.new(0, LayoutState.IsCompact and 9 or 13),
                 Parent = TabButton,
             })
             table.insert(LayoutRefs.TabPadding, ButtonPadding)
 
             TabLabel = New("TextLabel", {
                 BackgroundTransparency = 1,
-                Position = UDim2.fromOffset(30, 0),
-                Size = UDim2.new(1, -30, 1, 0),
+                Position = UDim2.fromOffset(36, 0),
+                Size = UDim2.new(1, -36, 1, 0),
                 Text = Name,
-                TextSize = 16,
+                TextSize = 17,
+                Font = Library.Scheme.Font,
                 TextTransparency = 0.5,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 Visible = not LayoutState.IsCompact,
@@ -6883,7 +6922,7 @@ function Library:CreateWindow(WindowInfo)
                 Parent = TabContainer,
             })
             New("UIListLayout", {
-                Padding = UDim.new(0, 6),
+                Padding = UDim.new(0, 12),
                 Parent = TabLeft,
             })
             New("UIPadding", {
@@ -6919,7 +6958,7 @@ function Library:CreateWindow(WindowInfo)
                 Parent = TabContainer,
             })
             New("UIListLayout", {
-                Padding = UDim.new(0, 6),
+                Padding = UDim.new(0, 10),
                 Parent = TabRight,
             })
             New("UIPadding", {
@@ -7195,10 +7234,7 @@ function Library:CreateWindow(WindowInfo)
                     Size = false,
                 })
 
-                Library:MakeLine(GroupboxHolder, {
-                    Position = UDim2.fromOffset(0, 34),
-                    Size = UDim2.new(1, 0, 0, 1),
-                })
+                -- Removed line, using gradient background instead
 
                 local BoxIcon = Library:GetCustomIcon(Info.IconName)
                 if BoxIcon then
@@ -7213,30 +7249,57 @@ function Library:CreateWindow(WindowInfo)
                     })
                 end
 
-                GroupboxLabel = New("TextLabel", {
-                    BackgroundTransparency = 1,
+                -- Add gradient background to groupbox label area
+                local LabelBg = New("Frame", {
+                    BackgroundColor3 = Library.Scheme.AccentColor,
+                    BackgroundTransparency = 0.92,
                     Position = UDim2.fromOffset(BoxIcon and 24 or 0, 0),
-                    Size = UDim2.new(1, 0, 0, 34),
-                    Text = Info.Name,
-                    TextSize = 15,
-                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Size = UDim2.new(1, 0, 0, 40),
                     Parent = GroupboxHolder,
                 })
+                local LabelGradient = New("UIGradient", {
+                    Color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, Library.Scheme.AccentGradientStart),
+                        ColorSequenceKeypoint.new(1, Library.Scheme.AccentGradientEnd),
+                    }),
+                    Rotation = 0,
+                    Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 0.92),
+                        NumberSequenceKeypoint.new(1, 0.95),
+                    }),
+                    Parent = LabelBg,
+                })
+                New("UICorner", {
+                    CornerRadius = UDim.new(0, WindowInfo.CornerRadius),
+                    Parent = LabelBg,
+                })
+                
+                GroupboxLabel = New("TextLabel", {
+                    BackgroundTransparency = 1,
+                    Position = UDim2.fromOffset(BoxIcon and 32 or 8, 0),
+                    Size = UDim2.new(1, -(BoxIcon and 32 or 8), 1, 0),
+                    Text = Info.Name,
+                    TextSize = 16,
+                    Font = Library.Scheme.Font,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Parent = LabelBg,
+                })
                 New("UIPadding", {
-                    PaddingLeft = UDim.new(0, 12),
-                    PaddingRight = UDim.new(0, 12),
+                    PaddingLeft = UDim.new(0, 14),
+                    PaddingRight = UDim.new(0, 14),
+                    PaddingTop = UDim.new(0, 3),
                     Parent = GroupboxLabel,
                 })
 
                 GroupboxContainer = New("Frame", {
                     BackgroundTransparency = 1,
-                    Position = UDim2.fromOffset(0, 35),
-                    Size = UDim2.new(1, 0, 1, -35),
+                    Position = UDim2.fromOffset(0, 40),
+                    Size = UDim2.new(1, 0, 1, -40),
                     Parent = GroupboxHolder,
                 })
 
                 GroupboxList = New("UIListLayout", {
-                    Padding = UDim.new(0, 8),
+                    Padding = UDim.new(0, 12),
                     Parent = GroupboxContainer,
                 })
                 New("UIPadding", {
@@ -7259,7 +7322,7 @@ function Library:CreateWindow(WindowInfo)
             }
 
             local function ResizeGroupbox()
-                GroupboxHolder.Size = UDim2.new(1, 0, 0, (GroupboxList.AbsoluteContentSize.Y + 53) * Library.DPIScale)
+                GroupboxHolder.Size = UDim2.new(1, 0, 0, (GroupboxList.AbsoluteContentSize.Y + 59) * Library.DPIScale)
             end
 
             function Groupbox:Resize() task.defer(ResizeGroupbox) end
@@ -7461,7 +7524,7 @@ function Library:CreateWindow(WindowInfo)
             end
 
             TweenService:Create(TabButton, Library.TweenInfo, {
-                BackgroundTransparency = 0,
+                BackgroundTransparency = 0.3,
             }):Play()
             TweenService:Create(TabLabel, Library.TweenInfo, {
                 TextTransparency = 0,
@@ -7495,7 +7558,7 @@ function Library:CreateWindow(WindowInfo)
 
         function Tab:Hide()
             TweenService:Create(TabButton, Library.TweenInfo, {
-                BackgroundTransparency = 1,
+                BackgroundTransparency = 0.7,
             }):Play()
             TweenService:Create(TabLabel, Library.TweenInfo, {
                 TextTransparency = 0.5,
