@@ -1,3 +1,5 @@
+-- THIS IS A PROTOTYPE AND IN ALPHA A LOT OF THINGS ARE EXPECTED TO BE CHANGED.
+
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
 end)
