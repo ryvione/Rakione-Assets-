@@ -14,7 +14,7 @@ This repository contains the supporting files and assets for Rakione, including:
 
 
 
-## 📝 Known Issues
+##  Known Issues
 
 - Too much issues to list them and yeah im lazy.. only for RakioneUI tho
 
