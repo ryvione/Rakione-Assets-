@@ -1576,15 +1576,15 @@ function Library:AddGlowEffect(Frame: GuiObject, Intensity: number?)
         Parent = Frame.Parent,
     })
     
-    local GlowGradient = New("UIGradient", {
-        Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Library.Scheme.AccentGradientStart),
-            ColorSequenceKeypoint.new(0.5, Library.Scheme.AccentGradientEnd),
-            ColorSequenceKeypoint.new(1, Library.Scheme.AccentGradientStart),
-        },
-        Rotation = 45,
-        Parent = Glow,
-    })
+   local GlowGradient = New("UIGradient", {
+    Color = ColorSequence.new({ 
+        ColorSequenceKeypoint.new(0, Library.Scheme.AccentGradientStart),
+        ColorSequenceKeypoint.new(0.5, Library.Scheme.AccentGradientEnd),
+        ColorSequenceKeypoint.new(1, Library.Scheme.AccentGradientStart),
+    }), 
+    Rotation = 45,
+    Parent = Glow,
+})
     
     New("UICorner", {
         CornerRadius = UDim.new(0, 10),
