@@ -201,7 +201,7 @@ local Library = {
         OutlineColor = Color3.fromRGB(50, 40, 30),
         OutlineGlow = Color3.fromRGB(255, 140, 0),
         FontColor = Color3.new(1, 1, 1),
-        Font = Font.fromEnum(Enum.Font.Magnifico),
+        Font = Font.fromEnum(Enum.Font.SourceSansBold),
 
         Red = Color3.fromRGB(255, 50, 50),
         Dark = Color3.new(0, 0, 0),
@@ -296,7 +296,7 @@ local Templates = {
         CornerRadius = 16,
         NotifySide = "Right",
         ShowCustomCursor = true,
-        Font = Enum.Font.Magnifico,
+        Font = Enum.Font.SourceSansBold,
         ToggleKeybind = Enum.KeyCode.RightControl,
         MobileButtonsSide = "Left",
         UnlockMouseWhileOpen = true,
