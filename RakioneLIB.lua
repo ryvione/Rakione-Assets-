@@ -1201,7 +1201,12 @@ local function FillInstance(Table: { [string]: any }, Instance: GuiObject)
             end
         end
 
-        Instance[k] = v
+        -- Convert Font to FontFace for text objects
+        if k == "Font" and (Instance:IsA("TextLabel") or Instance:IsA("TextButton") or Instance:IsA("TextBox")) then
+            Instance.FontFace = v
+        else
+            Instance[k] = v
+        end
     end
 
     if GetTableSize(ThemeProperties) > 0 then
@@ -6436,7 +6441,7 @@ function Library:CreateWindow(WindowInfo)
             BackgroundTransparency = 1,
             Text = WindowInfo.Title,
             TextSize = 22,
-            Font = Library.Scheme.Font,
+            FontFace = Library.Scheme.Font,
             Visible = not LayoutState.IsCompact,
             Parent = TitleHolder,
         })
@@ -6885,7 +6890,7 @@ function Library:CreateWindow(WindowInfo)
                 Size = UDim2.new(1, -36, 1, 0),
                 Text = Name,
                 TextSize = 17,
-                Font = Library.Scheme.Font,
+                FontFace = Library.Scheme.Font,
                 TextTransparency = 0.5,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 Visible = not LayoutState.IsCompact,
@@ -7280,7 +7285,7 @@ function Library:CreateWindow(WindowInfo)
                     Size = UDim2.new(1, -(BoxIcon and 32 or 8), 1, 0),
                     Text = Info.Name,
                     TextSize = 16,
-                    Font = Library.Scheme.Font,
+                    FontFace = Library.Scheme.Font,
                     TextXAlignment = Enum.TextXAlignment.Left,
                     Parent = LabelBg,
                 })
