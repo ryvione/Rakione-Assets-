@@ -1,5 +1,3 @@
--- The RakioneUI is experimental, so it's unstable a lot of fixes are gonna be applied.
-
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
 end)
@@ -11,6 +9,8 @@ local UserInputService: UserInputService = cloneref(game:GetService("UserInputSe
 local TextService: TextService = cloneref(game:GetService("TextService"))
 local Teams: Teams = cloneref(game:GetService("Teams"))
 local TweenService: TweenService = cloneref(game:GetService("TweenService"))
+local HttpService: HttpService = cloneref(game:GetService("HttpService"))
+local ContentProvider: ContentProvider = cloneref(game:GetService("ContentProvider"))
 
 local getgenv = getgenv or function()
     return shared
@@ -706,6 +706,47 @@ function Library:GetIcon(IconName: string)
     return nil
 end
 
+-- Helper function to load HTTP images properly
+-- NOTE: HTTP URLs don't work directly in Roblox ImageLabel/ImageButton
+-- You need to upload the image to Roblox and use rbxassetid://ASSET_ID
+-- OR use an executor that supports HTTP images
+local function LoadHTTPImage(ImageUrl: string, ImageInstance: GuiObject)
+    if not ImageUrl or not ImageUrl:match("^https?://") then
+        return
+    end
+    
+    -- Try multiple methods to load the image
+    task.spawn(function()
+        -- Method 1: Try setting directly (works in some executors like Synapse)
+        pcall(function()
+            ImageInstance.Image = ImageUrl
+        end)
+        
+        -- Method 2: Preload using ContentProvider
+        pcall(function()
+            ContentProvider:PreloadAsync({ImageUrl})
+        end)
+        
+        -- Method 3: Try downloading and using getcustomasset if available
+        if getcustomasset then
+            pcall(function()
+                local imageData = game:HttpGet(ImageUrl)
+                if imageData then
+                    -- Save to temp file and use getcustomasset
+                    local tempPath = "Rakione/temp_logo.png"
+                    if writefile and isfile then
+                        writefile(tempPath, imageData)
+                        local assetId = getcustomasset(tempPath)
+                        if assetId then
+                            ImageInstance.Image = assetId
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+end
+
 function Library:GetCustomIcon(IconName: string)
     if IsValidCustomIcon(IconName) then
         return {
@@ -782,6 +823,9 @@ local function FillInstance(Table: { [string]: any }, Instance: GuiObject)
         -- Convert Font to FontFace for text objects
         if k == "Font" and (Instance:IsA("TextLabel") or Instance:IsA("TextButton") or Instance:IsA("TextBox")) then
             Instance.FontFace = v
+        -- Convert theme strings to Color3 for color properties
+        elseif (k == "TextColor3" or k == "BackgroundColor3" or k == "BorderColor3" or k == "ImageColor3") and typeof(v) == "string" and Library.Scheme[v] then
+            Instance[k] = Library.Scheme[v]
         else
             Instance[k] = v
         end
@@ -3089,13 +3133,13 @@ do
 
                     Button.Base.Text = "Are you sure?"
                     Button.Base.TextColor3 = Library.Scheme.AccentColor
-                    Library.Registry[Button.Base].TextColor3 = "AccentColor"
+                    Library.Registry[Button.Base].TextColor3 = function() return Library.Scheme.AccentColor end
 
                     local Clicked = WaitForEvent(Button.Base.MouseButton1Click, 0.5)
 
                     Button.Base.Text = Button.Text
                     Button.Base.TextColor3 = Button.Risky and Library.Scheme.Red or Library.Scheme.FontColor
-                    Library.Registry[Button.Base].TextColor3 = Button.Risky and "Red" or "FontColor"
+                    Library.Registry[Button.Base].TextColor3 = Button.Risky and function() return Library.Scheme.Red end or function() return Library.Scheme.FontColor end
 
                     if Clicked then
                         Library:SafeCallback(Button.Func)
@@ -3243,7 +3287,7 @@ do
 
         if Button.Risky then
             Button.Base.TextColor3 = Library.Scheme.Red
-            Library.Registry[Button.Base].TextColor3 = "Red"
+            Library.Registry[Button.Base].TextColor3 = function() return Library.Scheme.Red end
         end
 
         Button:UpdateColors()
@@ -6034,21 +6078,28 @@ function Library:CreateWindow(WindowInfo)
             local iconUrl = if tonumber(WindowInfo.Icon)
                 then string.format("rbxassetid://%d", WindowInfo.Icon)
                 else WindowInfo.Icon
+            print("[RakioneUI] Loading window icon:", iconUrl)
+            print("[RakioneUI] Icon type:", typeof(WindowInfo.Icon), "Is number:", tonumber(WindowInfo.Icon) ~= nil)
             WindowIcon = New("ImageButton", {
                 Image = iconUrl,
                 Size = WindowInfo.IconSize,
-                BackgroundTransparency = 1,
+                BackgroundTransparency = 0.5,
                 BackgroundColor3 = Library.Scheme.BackgroundColor,
                 Parent = TitleHolder,
             })
-            -- Preload HTTP images using ContentProvider
+            -- Debug: Check if image loads
+            WindowIcon:GetPropertyChangedSignal("Image"):Connect(function()
+                print("[RakioneUI] Window icon Image property changed to:", WindowIcon.Image)
+            end)
+            WindowIcon:GetPropertyChangedSignal("ImageTransparency"):Connect(function()
+                print("[RakioneUI] Window icon ImageTransparency:", WindowIcon.ImageTransparency)
+            end)
+            -- Load HTTP images properly
             if not tonumber(WindowInfo.Icon) and typeof(WindowInfo.Icon) == "string" and WindowInfo.Icon:match("^https?://") then
-                task.spawn(function()
-                    local ContentProvider = game:GetService("ContentProvider")
-                    pcall(function()
-                        ContentProvider:PreloadAsync({iconUrl})
-                    end)
-                end)
+                print("[RakioneUI] Attempting to load HTTP image:", iconUrl)
+                LoadHTTPImage(iconUrl, WindowIcon)
+            else
+                print("[RakioneUI] Using Roblox asset ID:", iconUrl)
             end
         else
             WindowIcon = New("TextButton", {
@@ -6441,7 +6492,7 @@ function Library:CreateWindow(WindowInfo)
                         BackgroundTransparency = 1,
                         Text = Icon.Text,
                         TextSize = 18,
-                        TextColor3 = "AccentColor",
+                        TextColor3 = Library.Scheme.AccentColor,
                         TextTransparency = 0.5,
                         Size = UDim2.fromOffset(24, 24),
                         SizeConstraint = Enum.SizeConstraint.RelativeYY,
@@ -7212,7 +7263,7 @@ function Library:CreateWindow(WindowInfo)
                         BackgroundTransparency = 1,
                         Text = Icon.Text,
                         TextSize = 18,
-                        TextColor3 = "AccentColor",
+                        TextColor3 = Library.Scheme.AccentColor,
                         TextTransparency = 0.5,
                         Size = UDim2.fromOffset(24, 24),
                         SizeConstraint = Enum.SizeConstraint.RelativeYY,
@@ -7462,7 +7513,11 @@ function Library:CreateWindow(WindowInfo)
 
     if Library.IsMobile then
         -- Replace toggle/lock buttons with Rakione logo button
-        local logoUrl = WindowInfo.Icon or "https://rakionedev.vercel.app/assets/rakione-logo-DYCfdTPN.png"
+        local logoUrl = WindowInfo.Icon and (tonumber(WindowInfo.Icon) and string.format("rbxassetid://%d", WindowInfo.Icon) or WindowInfo.Icon) or 109442766417914
+        if typeof(logoUrl) == "number" then
+            logoUrl = string.format("rbxassetid://%d", logoUrl)
+        end
+        print("[RakioneUI] Loading mobile logo button:", logoUrl)
         local LogoButton = New("ImageButton", {
             BackgroundColor3 = Library.Scheme.BackgroundColor,
             BackgroundTransparency = 0.3,
@@ -7483,14 +7538,17 @@ function Library:CreateWindow(WindowInfo)
         })
         Library:AddOutline(LogoButton)
         
-        -- Preload HTTP image
+        -- Debug: Check if image loads
+        LogoButton:GetPropertyChangedSignal("Image"):Connect(function()
+            print("[RakioneUI] Mobile logo Image property changed to:", LogoButton.Image)
+        end)
+        
+        -- Load HTTP image properly
         if typeof(logoUrl) == "string" and logoUrl:match("^https?://") then
-            task.spawn(function()
-                local ContentProvider = game:GetService("ContentProvider")
-                pcall(function()
-                    ContentProvider:PreloadAsync({logoUrl})
-                end)
-            end)
+            print("[RakioneUI] Attempting to load HTTP image for mobile button:", logoUrl)
+            LoadHTTPImage(logoUrl, LogoButton)
+        else
+            print("[RakioneUI] Using Roblox asset ID for mobile button:", logoUrl)
         end
         
         LogoButton.MouseButton1Click:Connect(function()
