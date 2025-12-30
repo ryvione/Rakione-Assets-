@@ -1,4 +1,4 @@
--- THIS IS A PROTOTYPE AND IN ALPHA A LOT OF THINGS ARE EXPECTED TO BE CHANGED.
+-- ALPHA
 
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
@@ -6038,9 +6038,18 @@ function Library:CreateWindow(WindowInfo)
                 Image = iconUrl,
                 Size = WindowInfo.IconSize,
                 BackgroundTransparency = 1,
+                BackgroundColor3 = Library.Scheme.BackgroundColor,
                 Parent = TitleHolder,
             })
-            -- For HTTP URLs, Roblox will load them automatically - no special handling needed
+            -- Preload HTTP images using ContentProvider
+            if not tonumber(WindowInfo.Icon) and typeof(WindowInfo.Icon) == "string" and WindowInfo.Icon:match("^https?://") then
+                task.spawn(function()
+                    local ContentProvider = game:GetService("ContentProvider")
+                    pcall(function()
+                        ContentProvider:PreloadAsync({iconUrl})
+                    end)
+                end)
+            end
         else
             WindowIcon = New("TextButton", {
                 Text = WindowInfo.Title:sub(1, 1),
@@ -7455,7 +7464,8 @@ function Library:CreateWindow(WindowInfo)
         -- Replace toggle/lock buttons with Rakione logo button
         local logoUrl = WindowInfo.Icon or "https://rakionedev.vercel.app/assets/rakione-logo-DYCfdTPN.png"
         local LogoButton = New("ImageButton", {
-            BackgroundTransparency = 1,
+            BackgroundColor3 = Library.Scheme.BackgroundColor,
+            BackgroundTransparency = 0.3,
             Size = UDim2.fromOffset(50, 50),
             Position = WindowInfo.MobileButtonsSide == "Right" and UDim2.new(1, -56, 0, 6) or UDim2.fromOffset(6, 6),
             AnchorPoint = WindowInfo.MobileButtonsSide == "Right" and Vector2.new(1, 0) or Vector2.zero,
@@ -7471,6 +7481,17 @@ function Library:CreateWindow(WindowInfo)
             CornerRadius = UDim.new(0, Library.CornerRadius),
             Parent = LogoButton,
         })
+        Library:AddOutline(LogoButton)
+        
+        -- Preload HTTP image
+        if typeof(logoUrl) == "string" and logoUrl:match("^https?://") then
+            task.spawn(function()
+                local ContentProvider = game:GetService("ContentProvider")
+                pcall(function()
+                    ContentProvider:PreloadAsync({logoUrl})
+                end)
+            end)
+        end
         
         LogoButton.MouseButton1Click:Connect(function()
             Library:Toggle()
