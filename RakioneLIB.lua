@@ -1,4 +1,4 @@
--- ALPHA
+-- The RakioneUI is experimental, so it's unstable a lot of fixes are gonna be applied.
 
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
