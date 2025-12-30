@@ -683,22 +683,22 @@ type IconModule = {
     GetAsset: (Name: string) -> Icon?,
 }
 
--- Custom icon system - uses simple text/emoji instead of external icons
+-- Custom icon system - uses clean letters instead of emojis
 local IconMap = {
-    ["home"] = "🏠",
-    ["user"] = "👤",
-    ["eye"] = "👁",
-    ["target"] = "🎯",
-    ["map-pin"] = "📍",
-    ["keyboard"] = "⌨️",
-    ["code"] = "💻",
-    ["settings"] = "⚙️",
-    ["cog"] = "⚙️",
-    ["key"] = "🔑",
+    ["home"] = "H",
+    ["user"] = "U",
+    ["eye"] = "E",
+    ["target"] = "T",
+    ["map-pin"] = "P",
+    ["keyboard"] = "K",
+    ["code"] = "C",
+    ["settings"] = "S",
+    ["cog"] = "S",
+    ["key"] = "K",
     ["check"] = "✓",
     ["chevron-up"] = "▲",
-    ["move-diagonal-2"] = "↔️",
-    ["move"] = "↔️",
+    ["move-diagonal-2"] = "↔",
+    ["move"] = "↔",
 }
 
 function Library:GetIcon(IconName: string)
@@ -748,6 +748,10 @@ local function LoadHTTPImage(ImageUrl: string, ImageInstance: GuiObject)
 end
 
 function Library:GetCustomIcon(IconName: string)
+    if not IconName or typeof(IconName) ~= "string" then
+        return nil
+    end
+    
     if IsValidCustomIcon(IconName) then
         return {
             Url = IconName,
@@ -756,13 +760,13 @@ function Library:GetCustomIcon(IconName: string)
             Custom = true,
         }
     elseif IconMap[IconName] then
-        -- Return text icon
+        -- Return text icon (clean letter, no emojis)
         return {
             Text = IconMap[IconName],
             IsText = true,
         }
     else
-        -- Default to first letter or emoji
+        -- Default to first letter (clean, no emojis)
         return {
             Text = IconName:sub(1, 1):upper(),
             IsText = true,
@@ -6094,8 +6098,20 @@ function Library:CreateWindow(WindowInfo)
             WindowIcon:GetPropertyChangedSignal("ImageTransparency"):Connect(function()
                 print("[RakioneUI] Window icon ImageTransparency:", WindowIcon.ImageTransparency)
             end)
-            -- Load HTTP images properly
-            if not tonumber(WindowInfo.Icon) and typeof(WindowInfo.Icon) == "string" and WindowInfo.Icon:match("^https?://") then
+            -- Preload Roblox asset IDs
+            if tonumber(WindowInfo.Icon) or iconUrl:match("^rbxassetid://") then
+                print("[RakioneUI] Preloading Roblox asset ID:", iconUrl)
+                task.spawn(function()
+                    local success, err = pcall(function()
+                        ContentProvider:PreloadAsync({iconUrl})
+                    end)
+                    if success then
+                        print("[RakioneUI] Successfully preloaded asset:", iconUrl)
+                    else
+                        print("[RakioneUI] Failed to preload asset:", err)
+                    end
+                end)
+            elseif typeof(WindowInfo.Icon) == "string" and WindowInfo.Icon:match("^https?://") then
                 print("[RakioneUI] Attempting to load HTTP image:", iconUrl)
                 LoadHTTPImage(iconUrl, WindowIcon)
             else
@@ -7225,7 +7241,7 @@ function Library:CreateWindow(WindowInfo)
 
         local TabContainer
 
-        Icon = if Icon == "key" then {Text = "🔑", IsText = true} else Library:GetCustomIcon(Icon)
+        Icon = if Icon == "key" then {Text = "K", IsText = true} else Library:GetCustomIcon(Icon)
         do
             TabButton = New("TextButton", {
                 BackgroundColor3 = "MainColor",
@@ -7543,8 +7559,20 @@ function Library:CreateWindow(WindowInfo)
             print("[RakioneUI] Mobile logo Image property changed to:", LogoButton.Image)
         end)
         
-        -- Load HTTP image properly
-        if typeof(logoUrl) == "string" and logoUrl:match("^https?://") then
+        -- Preload Roblox asset IDs
+        if logoUrl:match("^rbxassetid://") then
+            print("[RakioneUI] Preloading Roblox asset ID for mobile button:", logoUrl)
+            task.spawn(function()
+                local success, err = pcall(function()
+                    ContentProvider:PreloadAsync({logoUrl})
+                end)
+                if success then
+                    print("[RakioneUI] Successfully preloaded mobile logo asset:", logoUrl)
+                else
+                    print("[RakioneUI] Failed to preload mobile logo asset:", err)
+                end
+            end)
+        elseif typeof(logoUrl) == "string" and logoUrl:match("^https?://") then
             print("[RakioneUI] Attempting to load HTTP image for mobile button:", logoUrl)
             LoadHTTPImage(logoUrl, LogoButton)
         else
